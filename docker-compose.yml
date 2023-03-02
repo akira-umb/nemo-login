@@ -1,0 +1,55 @@
+version: "3"
+services:
+
+  neo4j:
+    build:
+      context: ./neo4j
+      dockerfile: Dockerfile
+    image: portal-neo4j-login:latest
+    ports:
+      - "7474:7474"
+      - "7473:7473"
+      - "7687:7687"
+    networks:
+      - portal-trunk
+    volumes:
+      - ./neo4j/data:/var/lib/neo4j/data
+
+  portal-api:
+    build:
+      context: ./portal-api
+      dockerfile: Dockerfile
+    image: portal-api-login:latest
+    ports:
+      - "5000:80"
+    networks:
+      portal-trunk:
+        aliases: 
+          - portal-api
+    depends_on:
+      - "neo4j"
+    restart: on-failure
+    volumes:
+      - ./portal-api:/export/portal-api
+      - ./portal-ui:/export/portal-ui
+
+  portal-ui:
+    build:
+      context: ./portal-ui
+      dockerfile: Dockerfile
+    image: portal-ui-login:latest
+    ports:
+      - "8080:8080"
+    networks:
+      portal-trunk:
+        aliases: 
+          - portal-ui
+    depends_on:
+      - "portal-api"
+    restart: on-failure
+    volumes:
+      - ./portal-ui:/export/portal-ui
+
+networks:
+  portal-trunk:
+    driver: bridge
