@@ -2,7 +2,7 @@ import os
 import tempfile
 
 import pytest
-from app import create_app, db
+from app import create_app, application, db
 
 with open(os.path.join(os.path.dirname(__file__), 'data.sql'), 'rb') as f:
     _data_sql = f.read().decode('utf8')
@@ -52,3 +52,6 @@ class AuthActions(object):
 @pytest.fixture
 def auth(client):
     return AuthActions(client)
+
+def test_request_example(client):
+    response = client.get("/posts")

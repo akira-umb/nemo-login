@@ -2,10 +2,9 @@
 from shutil import Error
 from flask import (
     Flask, jsonify, request, redirect, jsonify, make_response, 
-    render_template, flash, abort, send_from_directory
+    render_template, flash, abort, send_from_directory, current_app, Blueprint
     )
 from flask.views import MethodView
-
 
 from query import get_urls_for_download, cache_facet_counts
 from query import get_front_page_bar_chart_data, get_all_study_data
@@ -29,21 +28,16 @@ from flask_caching import Cache
 
 # temp config for auth
 from flask_login import LoginManager
-from auth.auth import oauth, authbp, User, db
+from auth.auth import oauth, authbp, db
 import auth.config as auth_config
+
+appbp = Blueprint('appbp', __name__)
 
 login_manager = LoginManager()
 
 config = { "CACHE_TYPE": "simple" }
 
 
-application = Flask(__name__, instance_relative_config=True)
-application.config.from_mapping(config)
-application.secret_key = secret_key
-application.cache = Cache(application)
-
-# Set to True to see print statements in log file
-application.debug = True
 
 # NOTE (DOLLEY): Removed: 1)Not presently used, 2)Caused flask to pip install at version 1.1.2. We want the apt install version 
 # CORS(application, origins=access_origin, supports_credentials=True, methods=['GET','OPTIONS','POST'])
@@ -53,24 +47,24 @@ bar_graph_data = get_front_page_bar_chart_data()
 sdata_counts = get_study_sample_counts()
 
 
-@application.before_first_request
+@appbp.before_app_first_request
 def initialize_cache():
     config = load_config(file_name='config.json')
     build_cache = config['site-wide']['build-cache-on-first-request'] if "build-cache-on-first-request" in config else False 
     if build_cache:
         cache_facet_counts()
     
-@application.before_request
+@appbp.before_request
 def before():
     if request.method == 'OPTIONS':
         return 'OK'
 
-@application.route('/gql/_mapping', methods=['GET','OPTIONS','POST'])
+@appbp.route('/gql/_mapping', methods=['GET','OPTIONS','POST'])
 def get_maps():
     # consider anything in model_metadata_mapping as searchable
     return jsonify(dict(METADATA_MAPPING))
 
-@application.route('/home_example_queries', methods=['GET','OPTIONS','POST'])
+@appbp.route('/home_example_queries', methods=['GET','OPTIONS','POST'])
 def get_example_query_results():
     results = get_front_page_example_query_data()
     data_wrapped = {'data': results}
@@ -79,7 +73,7 @@ def get_example_query_results():
 
 
 # Route for specific cases endpoints that associates with various files
-@application.route('/samples/<case_id>', methods=['GET','OPTIONS','POST'])
+@appbp.route('/samples/<case_id>', methods=['GET','OPTIONS','POST'])
 def get_case_files(case_id):
     
     data = query.get_subject_sample(case_id)
@@ -91,14 +85,14 @@ def get_case_files(case_id):
     return make_json_response(data)
 
     
-@application.route('/files/<file_id>', methods=['GET','OPTIONS','POST'])
+@appbp.route('/files/<file_id>', methods=['GET','OPTIONS','POST'])
 def get_file_metadata(file_id):
 
     result = query.get_file_data(file_id)
     data = json.dumps(result, indent=2)
     return make_json_response(data)
 
-@application.route('/login', methods=['GET','OPTIONS','POST'])
+@appbp.route('/login', methods=['GET','OPTIONS','POST'])
 def login():
     error = None
 
@@ -120,7 +114,7 @@ def login():
 
     return render_template('login.html',error=error)
 
-@application.route('/status/logout', methods=['GET','OPTIONS','POST'])
+@appbp.route('/status/logout', methods=['GET','OPTIONS','POST'])
 def logout():
 
     # nullify all the info both in MySQL and stored in the UI for this session
@@ -130,7 +124,7 @@ def logout():
 
     return response
 
-@application.route('/status', methods=['GET','OPTIONS','POST'])
+@appbp.route('/status', methods=['GET','OPTIONS','POST'])
 def get_status():
     return 'OK'
 
@@ -139,7 +133,7 @@ def unauthorized(message):
     response.status_code = 401
     return response
 
-@application.route('/status/user', methods=['GET','OPTIONS','POST'])
+@appbp.route('/status/user', methods=['GET','OPTIONS','POST'])
 def get_status_user_unauthorized():
 
     if 'HTTP_X_CSRFTOKEN' in request.environ:
@@ -185,7 +179,7 @@ def get_status_user_unauthorized():
 #     #ids = request.form.getlist('ids') # need to figure out how to bundle
 #     return redirect(get_url_for_download(id))
 
-@application.route('/status/api/data', methods=['GET','OPTIONS','POST'])
+@appbp.route('/status/api/data', methods=['GET','OPTIONS','POST'])
 def get_status_api_data():
     cookie = request.form.get('downloadCookieKey')
     try:
@@ -245,7 +239,7 @@ def get_status_api_data():
         return response
 
 
-@application.route('/check_download_status', methods=['GET','OPTIONS','POST'])
+@appbp.route('/check_download_status', methods=['GET','OPTIONS','POST'])
 def get_tarball_status():
     is_complete = False
     # Get token from request
@@ -284,7 +278,7 @@ def get_tarball_status():
 
 
 # Developing a parallel track for the /cases route to migrate it off of the hard-coded GQL query
-@application.route('/samples', methods=['GET','OPTIONS','POST'])
+@appbp.route('/samples', methods=['GET','OPTIONS','POST'])
 def get_samples():
     
 
@@ -369,7 +363,7 @@ def get_samples():
     return make_json_response(data)
 
 
-@application.route('/files', methods=['GET','OPTIONS','POST'])
+@appbp.route('/files', methods=['GET','OPTIONS','POST'])
 def get_files():
 
     #TODO: mschor: So much of get_samples and get_files functions is similar; break out into smaller functions
@@ -440,7 +434,7 @@ def get_files():
 
 
 # Get data for table and piecharts on projects ("Studies") page 
-@application.route('/projects', methods=['GET','OPTIONS','POST'])
+@appbp.route('/projects', methods=['GET','OPTIONS','POST'])
 def get_projects():
     from_num = request.args.get('from')
     from_str = from_num
@@ -467,7 +461,7 @@ def get_projects():
 
 
 #Get data for bargraph on home page
-@application.route("/projects_graph_data", methods=['GET','OPTIONS','POST'])
+@appbp.route("/projects_graph_data", methods=['GET','OPTIONS','POST'])
 def get_projects_visualization_data():
     graph_type = request.args.get('graph_type')
 
@@ -506,13 +500,13 @@ def get_projects_visualization_data():
         return make_json_response(data)
 
 
-@application.route('/annotations', methods=['GET','OPTIONS','POST'])
+@appbp.route('/annotations', methods=['GET','OPTIONS','POST'])
 def get_annotation():
     return 'placeholder' # trimmed endpoint from GDC, not using for now
 
 # Calls sum_schema endpoint/GQL instance in order to return the necessary data
 # to populate the pie charts
-@application.route('/ui/search/summary', methods=['GET','OPTIONS','POST'])
+@appbp.route('/ui/search/summary', methods=['GET','OPTIONS','POST'])
 def get_ui_search_summary():
     
     filters = ""
@@ -537,7 +531,7 @@ def get_ui_search_summary():
 # NOTE: Used later for downloading manifest once user is 'in cloud' by utility:
 #       https://github.com/dcppc-phosphorous/manifest-downloader
 #       Currently used for DCPPC which runs on AWS
-@application.route('/manifest/download', methods=['GET'])
+@appbp.route('/manifest/download', methods=['GET'])
 def retrieve_manifest():
     id = request.args.get('id')
     try:
@@ -551,7 +545,7 @@ def retrieve_manifest():
         response.headers["status"] = 404
     return response
 
-@application.route('/status/api/manifest', methods=['GET','OPTIONS','POST'])
+@appbp.route('/status/api/manifest', methods=['GET','OPTIONS','POST'])
 def get_manifest():
     file_to_retrieve = 'manifest'
     config = load_config(file_name='config.json')
@@ -573,7 +567,7 @@ def get_manifest():
         return handler.download_file(request, file_data)
 
 
-@application.route('/status/api/files', methods=['GET','OPTIONS','POST'])
+@appbp.route('/status/api/files', methods=['GET','OPTIONS','POST'])
 def get_cart_metadata():
     file_to_retrieve = 'metadata'
     config = load_config(file_name='config.json')
@@ -595,7 +589,7 @@ def get_cart_metadata():
         return handler.download_file(request, metadata)
 
 
-@application.route('/status/api/terra', methods=['GET','OPTIONS','POST'])
+@appbp.route('/status/api/terra', methods=['GET','OPTIONS','POST'])
 def send_to_terra():
     """Send manifest data to Terra data framework.  Returns URL to UI that will open in new window."""
     file_to_retrieve = 'terra'  #dummy value to prevent erroring out
@@ -618,27 +612,27 @@ def send_to_terra():
     # Submit entities to Terra
     return handler.post_json_to_terra(json_entities)
 
-@application.route('/status/api/terra/<manifest_id>', methods=['GET','OPTIONS','POST'])
+@appbp.route('/status/api/terra/<manifest_id>', methods=['GET','OPTIONS','POST'])
 def export_to_terra(manifest_id):
     config = load_config(file_name='config.json')
     abbr = config['site-wide']['project-abbr'].lower()
     return send_from_directory(JSON_OUTDIR, "{}_{}.json".format(abbr, manifest_id))
 
 
-@application.route('/status/api/token', methods=['GET','OPTIONS','POST'])
+@appbp.route('/status/api/token', methods=['GET','OPTIONS','POST'])
 def get_token():
     ids = request.form.getlist('ids')
     token = get_manifest_token(ids) # get all the relevant properties for this file
     return token # need to decide how to communicate the token to the user
 
-@application.route('/client/token', methods=['GET','OPTIONS','POST'])
+@appbp.route('/client/token', methods=['GET','OPTIONS','POST'])
 def handle_client_token():
 
     cart = token_to_manifest(request.form.get('token'))
     response = make_json_response(cart)
     return response
 
-@application.route('/custom', methods=['GET', 'OPTIONS', 'POST'])
+@appbp.route('/custom', methods=['GET', 'OPTIONS', 'POST'])
 def get_config_custom():
     # Read the custom configuration file and pass it to AngularJS service config.service.ts
     config = load_config(file_name='config.json')
@@ -657,7 +651,26 @@ def make_json_response(data):
     response.headers['Content-Type'] = 'application/json'
     return response
 
+@appbp.route('/hi', methods=['GET', 'POST'])
+def say_hi():
+    print(application.url_map)
+    breh = application.url_map
+    return "hi"
+
+    
+@appbp.before_first_request
+def create_tables():
+    db.create_all()
+
 def create_app(test_config=None):
+
+    application = Flask(__name__, instance_relative_config=True)
+    application.config.from_mapping(config)
+    application.secret_key = secret_key
+    application.cache = Cache(application)
+
+    # Set to True to see print statements in log file
+    application.debug = True
     print('be_loc: ', be_loc)
     # application.run(host=be_loc,port=int(be_port), extra_files=['./config.ini', './models_metadata.ini'])
     dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -665,26 +678,22 @@ def create_app(test_config=None):
     metadata_filepath = os.path.join(dir_path, 'models_metadata.yml')
     facets_filepath = os.path.join(dir_path, 'facets.yml')
 
-    # all relevant to auth
+    # overwrite here for now not the best place
+    if test_config is None:
+        application.config.from_mapping(test_config)
+
     application.config.update(
         GOOGLE_CLIENT_ID=auth_config.GOOGLE_CLIENT_ID,
         GOOGLE_PROJECT_ID=auth_config.GOOGLE_PROJECT_ID,
         GOOGLE_CLIENT_SECRET=auth_config.GOOGLE_CLIENT_SECRET,
         SQLALCHEMY_DATABASE_URI=auth_config.SQLALCHEMY_DATABASE_URI
     )
+    # wasnt registering in factory
+    application.register_blueprint(authbp, url_prefix='/auth')
     login_manager.init_app(application)
     oauth.init_app(application)
-
-    @application.before_first_request
-    def create_tables():
-        db.create_all()
-
-    # overwrite here for now not the best place
-    if test_config is None:
-        application.config.from_mapping(test_config)
-    
     db.init_app(application)
-    application.register_blueprint(authbp, url_prefix='')
+
     application.run(host=be_loc,port=int(be_port), extra_files=[config_ini_filepath, metadata_filepath, facets_filepath], debug=True) 
     return application
 

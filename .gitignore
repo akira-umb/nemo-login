@@ -11,6 +11,7 @@ portal-ui/.tmp/
 portal-ui/coverage/
 portal-ui/report/
 portal-ui/.git
+portal-ui/**/.git
 
 *__pycache__
 *flask_caching
@@ -20,6 +21,8 @@ portal-api/conf.py
 portal-api/portal_api.wsgi
 portal-api/portal-apache2.conf
 portal-api/.git
+portal-api/instance
+portal-api/monitor.py
 
 neo4j/
 *.svn

@@ -30,8 +30,8 @@ RUN pip3 install -Iv Flask-Caching==1.9.0 \
     && pip3 install -Iv Flask-SQLAlchemy==3.0.3 \
     && pip3 install -Iv Flask-Login==0.6.2 \
     && pip3 install -I pytest \
-    && pip3 install -I coverage
-
+    && pip3 install -I coverage 
+    
 # CMD ["python", "app.py"]
 COPY ./portal-apache2.conf /etc/apache2/sites-available/portal-apache2.conf
 

@@ -8,7 +8,6 @@
 
 # routes
 
-
 from flask import Blueprint, redirect, request, url_for
 from flask_login import (
     current_user,
@@ -51,30 +50,34 @@ def fakehome():
             '<button type="submit">Login</button>'
             '</form>'
             )
-    
-@authbp.route('/login')
+        
+@authbp.route('/login', methods=['POST', 'GET'])
 def login():
     print(oauth.google.__dict__)
-    redirect_uri = url_for('auth', _external=True)
+    redirect_uri = url_for('authbp.authorize', _external=True)
     return oauth.google.authorize_redirect(redirect_uri)
 
-@authbp.route('/login-pw', methods=['POST'])
-def login_pw():
+@authbp.route('/loginpw', methods=['POST'])
+def loginpw():
     # verify credentials and get user
     # return jwts
-    email = request.form.get('email')
-    password = request.form.get('password')
+    email = request.json.get('email')
+    password = request.json.get('password')
     user = User.getby_email(email)
+    msg="testing config changes"
+    msg = msg + email + password
     if not user:
         user = User(email=email)
         user = User.create(user)
         user = User.getby_email(email)
+        msg = msg + "new user created "
     if user.check_password(password):
         login_user(user)
-    return redirect(url_for("fakehome"))
+        msg = msg + "user logged in success"
+    return msg
 
-@authbp.route('/authorize')
-def auth():
+@authbp.route('/authorize', methods=['POST', 'GET'])
+def authorize():
     print("reached here")
     # for our purposes dont need to keep track of this
     token = oauth.google.authorize_access_token()
@@ -91,7 +94,7 @@ def auth():
             user = User.getby_email(users_email)
         result = login_user(user)
         print(result)
-        return redirect(url_for("index"))
+        return redirect(url_for("authbp.index"))
     else:
         return "User unverified", 400
     
@@ -100,7 +103,7 @@ def auth():
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for("fakehome"))
+    return redirect(url_for("authbp.fakehome"))
 
 # models
 from flask_sqlalchemy import SQLAlchemy
